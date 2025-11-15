@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Li-Fi Text Sender</title>
+<style>
+    body {
+        background: #111;
+        color: #0f0;
+        font-family: monospace;
+        text-align: center;
+        padding-top: 40px;
+    }
+    input, button {
+        padding: 10px;
+        font-size: 18px;
+        margin-top: 10px;
+        width: 80%;
+        max-width: 350px;
+        border-radius: 8px;
+    }
+    #flashStatus {
+        margin-top: 20px;
+        font-size: 22px;
+        color: #0f0;
+    }
+</style>
+</head>
+<body>
+
+<h1>💡 Li-Fi Text Sender</h1>
+
+<input id="messageInput" type="text" placeholder="Type message here...">
+<br>
+<button onclick="startTransmission()">Send via Li-Fi</button>
+
+<div id="flashStatus"></div>
+
+<script>
+// FLASHLIGHT CONTROL (mobile phones)
+let stream;
+let torchOn = false;
+
+async function toggleFlash(state) {
+    try {
+        if (!stream) {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }});
+        }
+        const track = stream.getVideoTracks()[0];
+
+        await track.applyConstraints({
+            advanced: [{ torch: state }]
+        });
+
+        torchOn = state;
+        document.getElementById("flashStatus").innerText = state ? "LED: ON" : "LED: OFF";
+    } catch (err) {
+        alert("Torch/flashlight not supported on this device!");
+    }
+}
+
+// Convert a character to 8-bit binary
+function charToBinary(char) {
+    return char.charCodeAt(0).toString(2).padStart(8, "0");
+}
+
+// Send ON/OFF pulse
+async function sendBit(bit) {
+    if (bit === "1") {
+        await toggleFlash(true);
+    } else {
+        await toggleFlash(false);
+    }
+    return new Promise(resolve => setTimeout(resolve, 200)); // 200ms bit time
+}
+
+async function startTransmission() {
+    let msg = document.getElementById("messageInput").value;
+
+    if (!msg) {
+        alert("Enter a message first!");
+        return;
+    }
+
+    document.getElementById("flashStatus").innerText = "Starting...";
+
+    // START BIT = 1
+    await sendBit("1");
+    await sendBit("0"); // small separator
+
+    // SEND MESSAGE
+    for (let i = 0; i < msg.length; i++) {
+        let bin = charToBinary(msg[i]);
+        console.log("Sending:", msg[i], bin);
+        for (let b of bin) {
+            await sendBit(b);
+        }
+    }
+
+    // SEND STOP BYTE = 00000000
+    for (let i = 0; i < 8; i++) {
+        await sendBit("0");
+    }
+
+    document.getElementById("flashStatus").innerText = "Done!";
+    await toggleFlash(false);
+}
+</script>
+
+</body>
+</html>
